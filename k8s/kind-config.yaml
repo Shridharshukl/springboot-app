@@ -1,0 +1,31 @@
+# Kind cluster configuration for PetClinic monitoring lab
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+name: petclinic-monitoring
+nodes:
+  - role: control-plane
+    kubeadmConfigPatches:
+      - |
+        kind: InitConfiguration
+        nodeRegistration:
+          kubeletExtraArgs:
+            node-labels: "ingress-ready=true"
+    extraPortMappings:
+      # Prometheus
+      - containerPort: 30090
+        hostPort: 30090
+        protocol: TCP
+      # Grafana
+      - containerPort: 30030
+        hostPort: 30030
+        protocol: TCP
+      # Alertmanager
+      - containerPort: 30093
+        hostPort: 30093
+        protocol: TCP
+      # API Gateway
+      - containerPort: 30080
+        hostPort: 30080
+        protocol: TCP
+  - role: worker
+  - role: worker

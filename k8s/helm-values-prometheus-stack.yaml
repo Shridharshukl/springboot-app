@@ -1,0 +1,240 @@
+##########################################################
+# Helm values for kube-prometheus-stack
+# Chart: prometheus-community/kube-prometheus-stack
+# This configures Prometheus, Grafana, Alertmanager
+# for the Spring PetClinic microservices monitoring lab
+##########################################################
+
+# ==========================================
+# PROMETHEUS
+# ==========================================
+prometheus:
+  prometheusSpec:
+    # Scrape all ServiceMonitors across namespaces
+    serviceMonitorSelectorNilUsesHelmValues: false
+    serviceMonitorSelector: {}
+    serviceMonitorNamespaceSelector: {}
+
+    # Scrape all PodMonitors
+    podMonitorSelectorNilUsesHelmValues: false
+    podMonitorSelector: {}
+    podMonitorNamespaceSelector: {}
+
+    # Scrape all PrometheusRules
+    ruleSelectorNilUsesHelmValues: false
+    ruleSelector: {}
+    ruleNamespaceSelector: {}
+
+    # Retention
+    retention: 15d
+    retentionSize: "5GB"
+
+    # Resources
+    resources:
+      requests:
+        cpu: 200m
+        memory: 512Mi
+      limits:
+        cpu: 1000m
+        memory: 2Gi
+
+    # Storage - use emptyDir for Kind lab
+    storageSpec:
+      emptyDir:
+        medium: ""
+        sizeLimit: 10Gi
+
+    # Additional scrape configs for petclinic services (backup static discovery)
+    additionalScrapeConfigs:
+      - job_name: petclinic-api-gateway
+        metrics_path: /actuator/prometheus
+        scrape_interval: 15s
+        static_configs:
+          - targets: ['api-gateway.petclinic.svc.cluster.local:8080']
+            labels:
+              application: api-gateway
+
+      - job_name: petclinic-customers-service
+        metrics_path: /actuator/prometheus
+        scrape_interval: 15s
+        static_configs:
+          - targets: ['customers-service.petclinic.svc.cluster.local:8081']
+            labels:
+              application: customers-service
+
+      - job_name: petclinic-visits-service
+        metrics_path: /actuator/prometheus
+        scrape_interval: 15s
+        static_configs:
+          - targets: ['visits-service.petclinic.svc.cluster.local:8082']
+            labels:
+              application: visits-service
+
+      - job_name: petclinic-vets-service
+        metrics_path: /actuator/prometheus
+        scrape_interval: 15s
+        static_configs:
+          - targets: ['vets-service.petclinic.svc.cluster.local:8083']
+            labels:
+              application: vets-service
+
+      - job_name: petclinic-admin-server
+        metrics_path: /actuator/prometheus
+        scrape_interval: 15s
+        static_configs:
+          - targets: ['admin-server.petclinic.svc.cluster.local:9090']
+            labels:
+              application: admin-server
+
+      - job_name: petclinic-config-server
+        metrics_path: /actuator/prometheus
+        scrape_interval: 15s
+        static_configs:
+          - targets: ['config-server.petclinic.svc.cluster.local:8888']
+            labels:
+              application: config-server
+
+      - job_name: petclinic-discovery-server
+        metrics_path: /actuator/prometheus
+        scrape_interval: 15s
+        static_configs:
+          - targets: ['discovery-server.petclinic.svc.cluster.local:8761']
+            labels:
+              application: discovery-server
+
+  service:
+    type: NodePort
+    nodePort: 30090
+
+# ==========================================
+# ALERTMANAGER
+# ==========================================
+alertmanager:
+  alertmanagerSpec:
+    resources:
+      requests:
+        cpu: 50m
+        memory: 64Mi
+      limits:
+        cpu: 200m
+        memory: 256Mi
+    storage:
+      emptyDir:
+        medium: ""
+        sizeLimit: 1Gi
+
+  service:
+    type: NodePort
+    nodePort: 30093
+
+  config:
+    global:
+      resolve_timeout: 5m
+    inhibit_rules:
+      - source_matchers:
+          - 'severity = critical'
+        target_matchers:
+          - 'severity =~ warning|info'
+        equal: ['alertname', 'namespace']
+    route:
+      group_by: ['namespace', 'alertname']
+      group_wait: 30s
+      group_interval: 5m
+      repeat_interval: 4h
+      receiver: 'default-receiver'
+      routes:
+        - receiver: 'critical-receiver'
+          matchers:
+            - severity = critical
+          continue: true
+    receivers:
+      - name: 'default-receiver'
+        # Webhook receiver (can be extended with Slack, PagerDuty, etc.)
+        webhook_configs:
+          - url: 'http://alertmanager-webhook:9095/webhook'
+            send_resolved: true
+      - name: 'critical-receiver'
+        webhook_configs:
+          - url: 'http://alertmanager-webhook:9095/webhook'
+            send_resolved: true
+
+# ==========================================
+# GRAFANA
+# ==========================================
+grafana:
+  enabled: true
+
+  adminUser: admin
+  adminPassword: petclinic2026
+
+  service:
+    type: NodePort
+    nodePort: 30030
+
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+  # Built-in datasource (Prometheus is auto-configured)
+  sidecar:
+    dashboards:
+      enabled: true
+      searchNamespace: ALL
+      label: grafana_dashboard
+    datasources:
+      enabled: true
+      searchNamespace: ALL
+
+  # Additional datasources
+  additionalDataSources:
+    - name: Prometheus
+      type: prometheus
+      url: http://prometheus-kube-prometheus-prometheus.monitoring.svc.cluster.local:9090
+      access: proxy
+      isDefault: true
+      editable: true
+
+  # Grafana configuration
+  grafana.ini:
+    server:
+      root_url: "%(protocol)s://%(domain)s:%(http_port)s/grafana/"
+    auth.anonymous:
+      enabled: true
+      org_name: Main Org.
+      org_role: Viewer
+    security:
+      allow_embedding: true
+    dashboards:
+      default_home_dashboard_path: /tmp/dashboards/petclinic-overview.json
+
+  # Persistence - use emptyDir for Kind lab
+  persistence:
+    enabled: false
+
+# ==========================================
+# KUBE-STATE-METRICS
+# ==========================================
+kubeStateMetrics:
+  enabled: true
+
+# ==========================================
+# NODE-EXPORTER
+# ==========================================
+nodeExporter:
+  enabled: true
+
+# ==========================================
+# PROMETHEUS-OPERATOR
+# ==========================================
+prometheusOperator:
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 200m
+      memory: 256Mi

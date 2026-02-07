@@ -1,0 +1,94 @@
+##########################################################
+# ServiceMonitor for Prometheus to scrape PetClinic services
+# This tells Prometheus Operator to auto-discover all
+# petclinic services with label monitoring: "true"
+##########################################################
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: petclinic-services
+  namespace: monitoring
+  labels:
+    release: prometheus  # Must match Helm release name
+    app: petclinic
+spec:
+  namespaceSelector:
+    matchNames:
+      - petclinic
+  selector:
+    matchLabels:
+      monitoring: "true"
+  endpoints:
+    - port: http
+      path: /actuator/prometheus
+      interval: 15s
+      scrapeTimeout: 10s
+---
+##########################################################
+# PrometheusRule - Alerting Rules for PetClinic
+##########################################################
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: petclinic-alerts
+  namespace: monitoring
+  labels:
+    release: prometheus
+    app: petclinic
+spec:
+  groups:
+    - name: petclinic.rules
+      rules:
+        # Service Down Alert
+        - alert: PetClinicServiceDown
+          expr: up{job=~".*petclinic.*|.*customers.*|.*visits.*|.*vets.*|.*api-gateway.*|.*config-server.*|.*discovery-server.*|.*admin-server.*"} == 0
+          for: 1m
+          labels:
+            severity: critical
+          annotations:
+            summary: "PetClinic service {{ $labels.job }} is down"
+            description: "{{ $labels.instance }} of job {{ $labels.job }} has been down for more than 1 minute."
+
+        # High Error Rate
+        - alert: PetClinicHighErrorRate
+          expr: |
+            rate(http_server_requests_seconds_count{status=~"5.."}[5m])
+            / rate(http_server_requests_seconds_count[5m]) > 0.05
+          for: 2m
+          labels:
+            severity: warning
+          annotations:
+            summary: "High error rate on {{ $labels.application }}"
+            description: "Error rate is above 5% on {{ $labels.uri }} (current: {{ $value | humanizePercentage }})"
+
+        # High Response Time
+        - alert: PetClinicHighLatency
+          expr: |
+            histogram_quantile(0.95, rate(http_server_requests_seconds_bucket[5m])) > 2
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "High latency on {{ $labels.application }}"
+            description: "95th percentile response time is above 2s (current: {{ $value }}s)"
+
+        # JVM Heap Usage High
+        - alert: PetClinicJvmHeapHigh
+          expr: |
+            jvm_memory_used_bytes{area="heap"} / jvm_memory_max_bytes{area="heap"} > 0.85
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "JVM heap usage high on {{ $labels.application }}"
+            description: "Heap usage is above 85% on {{ $labels.instance }} (current: {{ $value | humanizePercentage }})"
+
+        # Pod Restart Alert
+        - alert: PetClinicPodRestarting
+          expr: increase(kube_pod_container_status_restarts_total{namespace="petclinic"}[1h]) > 3
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Pod {{ $labels.pod }} is restarting frequently"
+            description: "Pod {{ $labels.pod }} has restarted {{ $value }} times in the last hour"
