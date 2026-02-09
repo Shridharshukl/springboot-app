@@ -1,0 +1,54 @@
+prometheus:
+  prometheusSpec:
+    replicas: 1
+    retention: 15d
+    scrapeInterval: 30s
+    evaluationInterval: 30s
+
+    serviceMonitorSelector:
+      matchLabels:
+        release: prometheus
+
+    serviceMonitorNamespaceSelector: {}
+
+    podMonitorNamespaceSelector: {}
+
+    resources:
+      requests:
+        cpu: 500m
+        memory: 1Gi
+      limits:
+        cpu: 1
+        memory: 2Gi
+
+grafana:
+  enabled: true
+  replicas: 1
+  persistence:
+    enabled: false
+    size: 10Gi
+
+alertmanager:
+  enabled: true
+  alertmanagerSpec:
+    replicas: 1
+
+  config:
+    global:
+      smtp_smarthost: "smtp.gmail.com:587"
+      smtp_from: "alerts@company.com"
+      smtp_auth_username: "alerts@company.com"
+      smtp_auth_password: "EMAIL_PASSWORD"
+      smtp_require_tls: true
+
+    route:
+      receiver: email-alerts
+      group_by: ["alertname", "namespace"]
+      group_wait: 30s
+      repeat_interval: 4h
+
+    receivers:
+      - name: email-alerts
+        email_configs:
+          - to: devops@company.com
+            send_resolved: true
