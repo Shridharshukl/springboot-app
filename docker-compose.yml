@@ -1,5 +1,8 @@
 services:
   config-server:
+    build:
+      context: .
+      dockerfile: spring-petclinic-config-server/Dockerfile
     image: springcommunity/spring-petclinic-config-server
     container_name: config-server
     deploy:
@@ -15,6 +18,9 @@ services:
      - 8888:8888
 
   discovery-server:
+    build:
+      context: .
+      dockerfile: spring-petclinic-discovery-server/Dockerfile
     image: springcommunity/spring-petclinic-discovery-server
     container_name: discovery-server
     deploy:
@@ -33,6 +39,9 @@ services:
      - 8761:8761
 
   customers-service:
+    build:
+      context: .
+      dockerfile: spring-petclinic-customers-service/Dockerfile
     image: springcommunity/spring-petclinic-customers-service
     container_name: customers-service
     deploy:
@@ -48,6 +57,9 @@ services:
     - 8081:8081
 
   visits-service:
+    build:
+      context: .
+      dockerfile: spring-petclinic-visits-service/Dockerfile
     image: springcommunity/spring-petclinic-visits-service
     container_name: visits-service
     deploy:
@@ -63,6 +75,9 @@ services:
      - 8082:8082
 
   vets-service:
+    build:
+      context: .
+      dockerfile: spring-petclinic-vets-service/Dockerfile
     image: springcommunity/spring-petclinic-vets-service
     container_name: vets-service
     deploy:
@@ -79,6 +94,9 @@ services:
 
 
   genai-service:
+    build:
+      context: .
+      dockerfile: spring-petclinic-genai-service/Dockerfile
     image: springcommunity/spring-petclinic-genai-service
     container_name: genai-service
     environment:
@@ -99,6 +117,9 @@ services:
 
 
   api-gateway:
+    build:
+      context: .
+      dockerfile: spring-petclinic-api-gateway/Dockerfile
     image: springcommunity/spring-petclinic-api-gateway
     container_name: api-gateway
     deploy:
@@ -124,6 +145,9 @@ services:
      - 9411:9411
 
   admin-server:
+    build:
+      context: .
+      dockerfile: spring-petclinic-admin-server/Dockerfile
     image: springcommunity/spring-petclinic-admin-server
     container_name: admin-server
     deploy:

@@ -1,0 +1,146 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: config-server-alerts
+  namespace: config-service
+  labels:
+    release: prometheus
+spec:
+  groups:
+    - name: config-server.rules
+      rules:
+
+        # -----------------------------------------------
+        # 1. Service Down
+        # -----------------------------------------------
+        - alert: ConfigServerDown
+          expr: up{namespace="config-service", service="config-server"} == 0
+          for: 1m
+          labels:
+            severity: critical
+          annotations:
+            summary: "Config Server is DOWN"
+            description: "Config Server in namespace config-service has been down for more than 1 minute."
+
+        # -----------------------------------------------
+        # 2. High CPU Usage (>80%)
+        # -----------------------------------------------
+        - alert: ConfigServerHighCPU
+          expr: |
+            sum(rate(container_cpu_usage_seconds_total{
+              namespace="config-service",
+              pod=~"config-server.*"
+            }[2m])) > 0.8
+          for: 3m
+          labels:
+            severity: warning
+          annotations:
+            summary: "High CPU usage on Config Server"
+            description: "Config Server CPU usage has exceeded 80% for more than 3 minutes."
+
+        # -----------------------------------------------
+        # 3. High Memory Usage (>80%)
+        # -----------------------------------------------
+        - alert: ConfigServerHighMemory
+          expr: |
+            sum(container_memory_working_set_bytes{
+              namespace="config-service",
+              pod=~"config-server.*"
+            })
+            /
+            sum(container_spec_memory_limit_bytes{
+              namespace="config-service",
+              pod=~"config-server.*"
+            }) > 0.8
+          for: 3m
+          labels:
+            severity: warning
+          annotations:
+            summary: "High memory usage on Config Server"
+            description: "Config Server memory usage has exceeded 80% of its limit for more than 3 minutes."
+
+        # -----------------------------------------------
+        # 4. Pod Restart Loop
+        # -----------------------------------------------
+        - alert: ConfigServerRestartLoop
+          expr: |
+            increase(kube_pod_container_status_restarts_total{
+              namespace="config-service",
+              pod=~"config-server.*"
+            }[15m]) > 3
+          for: 5m
+          labels:
+            severity: critical
+          annotations:
+            summary: "Config Server is restarting frequently"
+            description: "Config Server has restarted more than 3 times in the last 15 minutes."
+
+        # -----------------------------------------------
+        # 5. High HTTP Error Rate (5xx)
+        # -----------------------------------------------
+        - alert: ConfigServerHighErrorRate
+          expr: |
+            sum(rate(http_server_requests_seconds_count{
+              namespace="config-service",
+              job="config-server",
+              status=~"5.."
+            }[5m]))
+            /
+            sum(rate(http_server_requests_seconds_count{
+              namespace="config-service",
+              job="config-server"
+            }[5m])) > 0.05
+          for: 3m
+          labels:
+            severity: warning
+          annotations:
+            summary: "High 5xx error rate on Config Server"
+            description: "More than 5% of Config Server requests are returning 5xx errors."
+
+        # -----------------------------------------------
+        # 6. High Response Latency (>2s p99)
+        # -----------------------------------------------
+        - alert: ConfigServerHighLatency
+          expr: |
+            histogram_quantile(0.99, sum(rate(http_server_requests_seconds_bucket{
+              namespace="config-service",
+              job="config-server"
+            }[5m])) by (le)) > 2
+          for: 3m
+          labels:
+            severity: warning
+          annotations:
+            summary: "High latency on Config Server"
+            description: "Config Server p99 response time has exceeded 2 seconds for more than 3 minutes."
+
+        # -----------------------------------------------
+        # 7. JVM Heap Usage High (>80%)
+        # -----------------------------------------------
+        - alert: ConfigServerJVMHeapHigh
+          expr: |
+            jvm_memory_used_bytes{namespace="config-service", job="config-server", area="heap"}
+            /
+            jvm_memory_max_bytes{namespace="config-service", job="config-server", area="heap"} > 0.8
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Config Server JVM heap usage is high"
+            description: "Config Server JVM heap usage has exceeded 80% for more than 5 minutes."
+
+        # -----------------------------------------------
+        # 8. Pod Not Ready
+        # -----------------------------------------------
+        - alert: ConfigServerPodNotReady
+          expr: |
+            kube_pod_status_ready{
+              namespace="config-service",
+              pod=~"config-server.*",
+              condition="true"
+            } == 0
+          for: 3m
+          labels:
+            severity: critical
+          annotations:
+            summary: "Config Server pod is not ready"
+            description: "Config Server pod has been in a not-ready state for more than 3 minutes."

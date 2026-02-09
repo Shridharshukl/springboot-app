@@ -1,0 +1,36 @@
+# Git
+.git
+.gitignore
+.gitattributes
+
+# IDE
+.idea
+*.iml
+.vscode
+.devcontainer
+
+# Build output
+**/target/
+!**/target/*.jar
+
+# Documentation
+*.md
+LICENSE
+docs/
+
+# Docker (avoid recursive context)
+docker/
+docker-compose.yml
+
+# Scripts
+scripts/
+
+# Kubernetes
+k8s/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Test files
+**/src/test/jmeter/
